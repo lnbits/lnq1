@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LNQ1 Arena</title>
+    <link rel="stylesheet" href="/ext-assets/lnq1/q1k3/game.css?v=lnq1-respawn-1" />
+  </head>
+  <body>
+    <div id="d"></div>
+    <script src="/ext-assets/lnq1/lnbits-extension-sdk.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/qr.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/public.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/packed.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/document.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/ttt.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/audio.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/math_utils.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/model.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/map.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/renderer.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/input.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/weapons.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_player.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_player_dummy.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_jump_pad.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_light.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_torch.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_door.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_barrel.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_particle.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_projectile_grenade.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_projectile_nail.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_projectile_shell.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_projectile_plasma.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_projectile_gib.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_enemy.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_enemy_grunt.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_enemy_enforcer.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_enemy_ogre.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_enemy_zombie.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_enemy_hound.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_pickup.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_pickup_key.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_pickup_nailgun.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_pickup_grenadelauncher.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_pickup_health.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_pickup_nails.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_pickup_grenades.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/entity_trigger_level.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/textures.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/music.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/game.js?v=lnq1-respawn-1"></script>
+    <script src="/ext-assets/lnq1/q1k3/source/main.js?v=lnq1-respawn-1"></script>
+  </body>
+</html>

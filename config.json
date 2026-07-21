@@ -1,0 +1,126 @@
+{
+  "id": "lnq1",
+  "name": "LNQ1 Arena",
+  "short_description": "A paid multiplayer FPS arena where players win entry fees by scoring kills.",
+  "version": "0.1.0",
+  "min_lnbits_version": "1.5.6",
+  "tile": "/lnq1/static/assets/tile.svg",
+  "tags": ["gaming", "quake", "wasm", "lightning"],
+  "extension_type": "wasm",
+  "wasm": {
+    "module": "wasm/module.wasm",
+    "world": "lnq1",
+    "exports": [
+      {"name": "get-lnq1-settings", "visibility": "authenticated"},
+      {"name": "save-lnq1-settings", "visibility": "authenticated"},
+      {"name": "list-lnq1-wallets", "visibility": "authenticated"},
+      {"name": "create-lnq1-game", "visibility": "authenticated"},
+      {"name": "list-lnq1-games", "visibility": "authenticated"},
+      {"name": "delete-lnq1-game", "visibility": "authenticated"},
+      {"name": "get-public-lnq1-game", "visibility": "public"},
+      {"name": "join-lnq1-game", "visibility": "public"},
+      {"name": "declare-lnq1-kill", "visibility": "public"},
+      {"name": "publish-lnq1-state", "visibility": "public"},
+      {"name": "publish-lnq1-chat", "visibility": "public"},
+      {"name": "settle-lnq1-payout", "visibility": "authenticated"},
+      {"name": "record-lnq1-payment", "visibility": "event"}
+    ]
+  },
+  "events": {
+    "onInvoicePaid": "record-lnq1-payment"
+  },
+  "ui_routes": [
+    {
+      "path": "/lnq1",
+      "entrypoint": "ui/admin.html",
+      "auth": "user"
+    },
+    {
+      "path": "/lnq1/games/{game_id}",
+      "entrypoint": "ui/public.html",
+      "auth": "public",
+      "path_params": {
+        "game_id": "gameId"
+      }
+    }
+  ],
+  "api_routes": [
+    {"method": "GET", "path": "/settings", "export": "get-lnq1-settings", "auth": "user"},
+    {"method": "PUT", "path": "/settings", "export": "save-lnq1-settings", "auth": "user"},
+    {"method": "GET", "path": "/wallets", "export": "list-lnq1-wallets", "auth": "user"},
+    {"method": "POST", "path": "/games", "export": "create-lnq1-game", "auth": "user"},
+    {"method": "GET", "path": "/games", "export": "list-lnq1-games", "auth": "user"},
+    {
+      "method": "DELETE",
+      "path": "/games/{game_id}",
+      "export": "delete-lnq1-game",
+      "auth": "user",
+      "path_params": {"game_id": "gameId"}
+    },
+    {
+      "method": "GET",
+      "path": "/games/{game_id}",
+      "export": "get-public-lnq1-game",
+      "auth": "public",
+      "path_params": {"game_id": "gameId"},
+      "ownerContext": {"table": "lnq1_games", "idParam": "gameId"}
+    },
+    {
+      "method": "POST",
+      "path": "/games/{game_id}/join",
+      "export": "join-lnq1-game",
+      "auth": "public",
+      "path_params": {"game_id": "gameId"},
+      "ownerContext": {"table": "lnq1_games", "idParam": "gameId"}
+    },
+    {
+      "method": "POST",
+      "path": "/games/{game_id}/winner",
+      "export": "declare-lnq1-kill",
+      "auth": "public",
+      "path_params": {"game_id": "gameId"},
+      "ownerContext": {"table": "lnq1_games", "idParam": "gameId"}
+    },
+    {
+      "method": "POST",
+      "path": "/games/{game_id}/state",
+      "export": "publish-lnq1-state",
+      "auth": "public",
+      "path_params": {"game_id": "gameId"},
+      "ownerContext": {"table": "lnq1_games", "idParam": "gameId"}
+    },
+    {
+      "method": "POST",
+      "path": "/games/{game_id}/chat",
+      "export": "publish-lnq1-chat",
+      "auth": "public",
+      "path_params": {"game_id": "gameId"},
+      "ownerContext": {"table": "lnq1_games", "idParam": "gameId"}
+    },
+    {
+      "method": "POST",
+      "path": "/games/{game_id}/settle",
+      "export": "settle-lnq1-payout",
+      "auth": "user",
+      "path_params": {"game_id": "gameId"}
+    }
+  ],
+  "permissions": [
+    {"id": "ext.storage.read", "description": "Read LNQ1 settings, arenas, players, and payout records."},
+    {"id": "ext.storage.write", "description": "Write LNQ1 settings, arenas, players, and payment state."},
+    {"id": "wallet.list", "description": "Show the installing user's wallets for LNQ1 receipts."},
+    {
+      "id": "wallet.create_invoice_public",
+      "description": "Create public join invoices for configured LNQ1 wallets.",
+      "policies": [{"table": "lnq1_games", "wallet_field": "wallet_id"}]
+    },
+    {"id": "wallet.pay_invoice", "description": "Pay LNQ1 kill payouts to Lightning addresses."},
+    {"id": "wallet.pay_invoice_background", "description": "Pay LNQ1 kill payouts from an owner-approved wallet."},
+    {
+      "id": "websocket.publish",
+      "description": "Broadcast LNQ1 movement, shots, joins, deaths, and chat through LNbits.",
+      "policies": [{"max_messages_per_second": 180}]
+    },
+    {"id": "websocket.subscribe", "description": "Subscribe LNQ1 players to arena realtime updates."}
+  ]
+}
