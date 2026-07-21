@@ -42,6 +42,7 @@ class weapon_t {
 
 class weapon_shotgun_t extends weapon_t {
 	_init() {
+		this._network_type = 0;
 		this._texture = 7;
 		this._model = model_shotgun;
 		this._sound = sfx_shotgun_shoot;
@@ -62,6 +63,7 @@ class weapon_shotgun_t extends weapon_t {
 
 class weapon_nailgun_t extends weapon_t {
 	_init() {
+		this._network_type = 1;
 		this._texture = 4;
 		this._model = model_nailgun;
 		this._sound = sfx_nailgun_shoot;
@@ -75,6 +77,7 @@ class weapon_nailgun_t extends weapon_t {
 
 class weapon_grenadelauncher_t extends weapon_t {
 	_init() {
+		this._network_type = 2;
 		this._texture = 21;
 		this._model = model_grenadelauncher;
 		this._sound = sfx_grenade_shoot;

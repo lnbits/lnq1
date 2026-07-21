@@ -166,6 +166,29 @@ export function recordLnq1Payment(eventJson) {
   })
 }
 
+export function leaveLnq1Game(requestJson) {
+  return runJson(() => {
+    const request = parseJsonObject(requestJson)
+    const game = getGame(requiredText(request.gameId, 'gameId', 128))
+    const player = requireAlivePlayer(game.id, requiredText(request.playerToken ?? request.player_token, 'playerToken', 128))
+    const left = {
+      ...player,
+      status: 'left',
+      updated_at: system.now()
+    }
+    storage.set(PLAYERS_TABLE, left)
+    const updatedGame = withFreshPlayerCount({...game, updated_at: system.now()})
+    storage.set(GAMES_TABLE, updatedGame)
+    publishGameMessage(game.id, {
+      type: 'player_left',
+      playerId: player.id,
+      player: publicPlayer(left, true),
+      playersCount: updatedGame.players_count
+    })
+    return {game: publicGame(updatedGame), player: publicPlayer(left, true), status: left.status}
+  })
+}
+
 export function declareLnq1Kill(requestJson) {
   return runJson(() => {
     const request = parseJsonObject(requestJson)
@@ -194,7 +217,15 @@ export function declareLnq1Kill(requestJson) {
     storage.set(PLAYERS_TABLE, killed)
     const updatedGame = withFreshPlayerCount({...game, updated_at: system.now()})
     storage.set(GAMES_TABLE, updatedGame)
-    publishGameMessage(game.id, {type: 'player_killed', killerId: killer.id, victimId: victim.id, payout, playersCount: updatedGame.players_count})
+    publishGameMessage(game.id, {
+      type: 'player_killed',
+      killerId: killer.id,
+      victimId: victim.id,
+      killer: publicPlayer(killer, true),
+      victim: publicPlayer(killed, true),
+      payout,
+      playersCount: updatedGame.players_count
+    })
     return {game: publicGame(updatedGame), killer: publicPlayer(killer, true), victim: publicPlayer(killed, true), payout}
   })
 }
@@ -310,14 +341,22 @@ function payPlayer({walletId, lnAddress, amount, comment, description, extra}) {
   if (!walletId) return {ok: false, error: 'LNQ1 wallet is not configured.'}
   if (!lnAddress) return {ok: false, error: 'Lightning address is missing.'}
   const response = wallet.payLnurl({walletId, lnurl: lnAddress, amount, currency: 'sat', comment, maxSat: amount, description, extra})
+  const amountMsat = Number(response.amountMsat ?? response.amount_msat ?? 0) || amount * 1000
+  const feeMsat = Number(response.feeMsat ?? response.fee_msat ?? 0)
   return {
     ok: response.ok === true,
     error: response.error || '',
-    checkingId: response.checkingId || '',
-    paymentHash: response.paymentHash || '',
+    amount,
+    amountSat: amount,
+    checkingId: response.checkingId || response.checking_id || '',
+    paymentHash: response.paymentHash || response.payment_hash || '',
     status: response.status || '',
-    amountMsat: Number(response.amountMsat || 0),
-    feeMsat: Number(response.feeMsat || 0)
+    pending: response.pending === true,
+    success: response.success === true,
+    amountMsat,
+    amount_msat: amountMsat,
+    feeMsat,
+    fee_msat: feeMsat
   }
 }
 
@@ -333,7 +372,12 @@ function refundPlayer(game, lnAddress, amount, gameId, reason) {
 }
 
 function publishGameMessage(gameId, data) {
-  websocket.publish(gameChannel(gameId), data)
+  try {
+    websocket.publish(gameChannel(gameId), data)
+    return true
+  } catch (_error) {
+    return false
+  }
 }
 
 function gameChannel(gameId) {
@@ -355,7 +399,12 @@ function normalizePlayerState(value) {
     dead: value.dead === true,
     shooting: value.shooting === true,
     weapon: normalizeInteger(value.weapon, 0, 0, 20),
+    weaponType: normalizeInteger(value.weaponType ?? value.weapon_type, 0, 0, 20),
     ammo: normalizeInteger(value.ammo, 0, 0, 10000),
+    shotSequence: normalizeInteger(value.shotSequence ?? value.shot_sequence, 0, 0, 1000000000),
+    shotWeapon: normalizeInteger(value.shotWeapon ?? value.shot_weapon, 0, 0, 20),
+    shotWeaponType: normalizeInteger(value.shotWeaponType ?? value.shot_weapon_type, 0, 0, 20),
+    shotAmmo: normalizeInteger(value.shotAmmo ?? value.shot_ammo, 0, -1, 10000),
     vx: normalizeNumber(value.vx, 0, -10000, 10000),
     vy: normalizeNumber(value.vy, 0, -10000, 10000),
     vz: normalizeNumber(value.vz, 0, -10000, 10000),

@@ -12,6 +12,8 @@ document.body.innerHTML +=
 		'#msg{position:absolute;top:8vw;left:0;right:0;font-size:1.2vw;display:none;}'+
 		'#a,#h{position:absolute;bottom:3%;left:20%;right:0;font-size:3.2vw;}'+
 		'#h{left:-20%;}'+
+		'#feed{position:absolute;right:12px;bottom:12px;max-width:46%;padding:6px 8px;background:#0008;border:2px solid #ffffff33;font-size:14px;text-align:right;color:#eee;text-shadow:2px 2px #000;line-height:1.35;}'+
+		'#earn{position:absolute;right:12px;top:12px;padding:5px 8px;background:#0008;border:2px solid #ffffff33;font-size:18px;color:#fff;text-shadow:2px 2px #000;}'+
 		'h1{position:absolute;bottom:11%;left:0;right:0;font-size:9vw;margin:0;}'+
 		'#st{position:absolute;bottom:6%;left:0;right:0;}'+
 		'#join,#cf{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;z-index:3;}'+
@@ -23,8 +25,8 @@ document.body.innerHTML +=
 		'#join button:disabled{opacity:.55;cursor:wait;}'+
 		'#join small{display:block;margin-top:10px;line-height:1.35;color:#eee;text-align:center;}'+
 		'#join .qr{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:12px;}'+
-		'#join .qr small{max-width:100%;font-size:10px;font-weight:normal;text-align:left;}'+
-		'#join .qr img{width:170px;height:170px;background:#fff;padding:8px;image-rendering:auto;}'+
+		'#join .copy-invoice{width:100%;margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;text-align:left;}'+
+		'#join .qr img{width:255px;height:255px;background:#fff;padding:8px;image-rendering:auto;}'+
 		'#cf{pointer-events:none;background:transparent;overflow:hidden;}'+
 		'#cf i{position:absolute;top:-12px;width:10px;height:18px;animation:fall 1.8s linear forwards;}'+
 		'@keyframes fall{to{transform:translateY(110vh) rotate(520deg);opacity:.2;}}'+
@@ -34,15 +36,13 @@ document.body.innerHTML +=
 		'<div id="ts"><h1>LNQ1 ARENA</h1><div id="st">CLICK TO START</div></div>'+
 		'<div id="h"></div><div id="a"></div>'+
 		'<div id="msg"></div>'+
-	'</div>'+
-	'<p class="hud-controls">MOUSE SPEED: <input id="m" type="range" value=10 min=1 max=50> INVERT: <input type="checkbox" id="mi"></p>'+
-	'<p class="hud-controls"><input id="f" type="button" value="FULLSCREEN"></p>'+
-	'<p class="hud-credit">'+
-		'code: <a href="https://phoboslab.org">phoboslab.org</a> / music: <a href="http://no-fate.net">no-fate.net</a>'+
-	'</p>';
+		'<div id="feed"></div><div id="earn"></div>'+
+	'</div>';
 
 let ui_player_name = '',
-	ui_lnq1_mode = ui_is_lnq1;
+	ui_lnq1_mode = ui_is_lnq1,
+	m = {value: 10},
+	mi = {checked: false};
 
 ui_show_join = (done) => {
 	let join = document.createElement('div');

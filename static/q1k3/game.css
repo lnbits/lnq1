@@ -72,6 +72,36 @@ a {
   left: -20%;
 }
 
+#feed {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  max-width: 46%;
+  padding: 6px 8px;
+  background: #0008;
+  border: 2px solid #ffffff33;
+  color: #eee;
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: right;
+  text-shadow: 2px 2px #000;
+}
+
+#earn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  padding: 5px 8px;
+  background: #0008;
+  border: 2px solid #ffffff33;
+  color: #fff;
+  font-size: 18px;
+  font-weight: bold;
+  text-shadow: 2px 2px #000;
+}
+
 h1 {
   position: absolute;
   bottom: 11%;
@@ -176,23 +206,21 @@ h1 {
 }
 
 #join .qr img {
-  width: 170px;
-  height: 170px;
+  width: 255px;
+  height: 255px;
   padding: 8px;
   background: #fff;
   image-rendering: auto;
 }
 
-#join .qr small {
+#join .copy-invoice {
   width: 100%;
-  max-width: 100%;
-  max-height: 72px;
-  overflow: auto;
-  font-size: 10px;
-  font-weight: normal;
+  margin-top: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
   text-align: left;
-  overflow-wrap: anywhere;
-  word-break: break-all;
 }
 
 #cf {
@@ -207,39 +235,6 @@ h1 {
   width: 10px;
   height: 18px;
   animation: fall 1.8s linear forwards;
-}
-
-body > p {
-  position: fixed;
-  left: 0;
-  right: 0;
-  z-index: 4;
-  margin: 0;
-  color: #fff;
-  text-align: center;
-}
-
-.hud-controls,
-.hud-credit {
-  display: none;
-}
-
-.game-started .hud-controls,
-.game-started .hud-credit {
-  display: block;
-}
-
-body > p:nth-of-type(1) {
-  bottom: 48px;
-}
-
-body > p:nth-of-type(2) {
-  bottom: 24px;
-}
-
-body > p:nth-of-type(3) {
-  bottom: 4px;
-  font-size: 12px;
 }
 
 @keyframes fall {

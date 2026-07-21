@@ -37,7 +37,9 @@ game_spawn = (type, pos, p1, p2) =>  {
 	return entity;
 },
 
-game_local_snapshot = () => game_entity_player && !game_entity_player._dead ? {
+game_local_snapshot = () => {
+	let weapon = game_entity_player && game_entity_player._weapons[game_entity_player._weapon_index];
+	return game_entity_player && !game_entity_player._dead ? {
 	x: game_entity_player.p.x,
 	y: game_entity_player.p.y,
 	z: game_entity_player.p.z,
@@ -47,16 +49,26 @@ game_local_snapshot = () => game_entity_player && !game_entity_player._dead ? {
 	dead: !!game_entity_player._dead,
 	shooting: !!keys[key_action],
 	weapon: game_entity_player._weapon_index || 0,
-	ammo: game_entity_player._weapons[game_entity_player._weapon_index]._ammo || 0,
+	weaponType: weapon ? weapon._network_type || 0 : 0,
+	ammo: weapon ? weapon._ammo || 0 : 0,
+	shotSequence: game_entity_player._shot_sequence || 0,
+	shotWeapon: game_entity_player._shot_weapon || 0,
+	shotWeaponType: game_entity_player._shot_weapon_type || 0,
+	shotAmmo: game_entity_player._shot_ammo || 0,
 	vx: game_entity_player.v.x,
 	vy: game_entity_player.v.y,
 	vz: game_entity_player.v.z,
 	onGround: !!game_entity_player._on_ground,
 	t: game_time
-} : null,
+	} : null;
+},
 
 game_apply_remote_snapshot = (id, snapshot) => {
 	if (!id || !snapshot || !game_entity_player) {
+		return;
+	}
+	if (snapshot.dead) {
+		game_remove_remote_player(id);
 		return;
 	}
 	let sequence = Number(snapshot.sequence || 0);
@@ -77,9 +89,19 @@ game_apply_remote_snapshot = (id, snapshot) => {
 game_remove_remote_player = (id) => {
 	let remote = game_remote_players[id];
 	if (remote) {
-		remote._kill();
+		if (remote._remove_remote) {
+			remote._remove_remote();
+		}
+		else {
+			remote._kill();
+		}
 		delete game_remote_players[id];
 		delete game_remote_sequences[id];
+	}
+	for (let entity of game_entities) {
+		if (entity && entity._id == id && entity._remove_remote) {
+			entity._remove_remote();
+		}
 	}
 },
 

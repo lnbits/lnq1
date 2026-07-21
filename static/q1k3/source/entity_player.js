@@ -13,6 +13,10 @@ class entity_player_t extends entity_t {
 
 		this._weapons = [new weapon_shotgun_t];
 		this._weapon_index = 0;
+		this._shot_sequence = 0;
+		this._shot_weapon = 0;
+		this._shot_weapon_type = 0;
+		this._shot_ammo = 0;
 
 		// Map 1 needs some rotation of the starting look-at direction
 		this._yaw += game_map_index * Math.PI; 
@@ -81,6 +85,10 @@ class entity_player_t extends entity_t {
 			}
 			else {
 				weapon._shoot(this.p, this._yaw, this._pitch);
+				this._shot_sequence++;
+				this._shot_weapon = this._weapon_index;
+				this._shot_weapon_type = weapon._network_type || 0;
+				this._shot_ammo = weapon._needs_ammo ? weapon._ammo : -1;
 				game_spawn(entity_light_t, this.p, 10, 0xff)._die_at = game_time + 0.1;			
 			}
 		}

@@ -19,6 +19,7 @@
       {"name": "delete-lnq1-game", "visibility": "authenticated"},
       {"name": "get-public-lnq1-game", "visibility": "public"},
       {"name": "join-lnq1-game", "visibility": "public"},
+      {"name": "leave-lnq1-game", "visibility": "public"},
       {"name": "declare-lnq1-kill", "visibility": "public"},
       {"name": "publish-lnq1-state", "visibility": "public"},
       {"name": "publish-lnq1-chat", "visibility": "public"},
@@ -69,6 +70,14 @@
       "method": "POST",
       "path": "/games/{game_id}/join",
       "export": "join-lnq1-game",
+      "auth": "public",
+      "path_params": {"game_id": "gameId"},
+      "ownerContext": {"table": "lnq1_games", "idParam": "gameId"}
+    },
+    {
+      "method": "POST",
+      "path": "/games/{game_id}/leave",
+      "export": "leave-lnq1-game",
       "auth": "public",
       "path_params": {"game_id": "gameId"},
       "ownerContext": {"table": "lnq1_games", "idParam": "gameId"}

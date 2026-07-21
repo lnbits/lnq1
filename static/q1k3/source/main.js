@@ -137,7 +137,9 @@ game_load = async () => {
 	r_submit_buffer();
 	requestAnimationFrame(run_frame);
 
-	f.onclick = () => g.requestFullscreen();
+	if (window.f) {
+		f.onclick = () => g.requestFullscreen();
+	}
 	let game_started = 0,
 		sounds_ready = 0,
 		capture_prompt,

@@ -23,6 +23,21 @@
         return this.notify(message, 'negative')
       },
 
+      getSessionValue(key) {
+        return bridgeRequest({
+          action: 'storage.session.get',
+          key
+        })
+      },
+
+      setSessionValue(key, value) {
+        return bridgeRequest({
+          action: 'storage.session.set',
+          key,
+          value
+        })
+      },
+
       requestBackgroundPaymentPermission(grant) {
         return bridgeRequest({
           action: 'permissions.request_background_payment',
@@ -77,6 +92,13 @@
 
       joinGame(gameId, payload) {
         return request(`${baseUrl}/games/${encodeURIComponent(gameId)}/join`, {
+          method: 'POST',
+          body: payload
+        })
+      },
+
+      leaveGame(gameId, payload) {
+        return request(`${baseUrl}/games/${encodeURIComponent(gameId)}/leave`, {
           method: 'POST',
           body: payload
         })
