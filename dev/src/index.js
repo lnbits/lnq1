@@ -5,6 +5,7 @@ const GAMES_TABLE = 'lnq1_games'
 const PLAYERS_TABLE = 'lnq1_players'
 const SETTINGS_ID = 'lnq1-settings'
 const MAX_PLAYERS = 5
+const PRESENCE_TIMEOUT_SECONDS = 45
 const GAME_SEARCH_FIELDS = ['name', 'status']
 
 export function getLnq1Settings(_requestJson) {
@@ -91,7 +92,9 @@ export function deleteLnq1Game(requestJson) {
 export function getPublicLnq1Game(requestJson) {
   return runJson(() => {
     const request = parseJsonObject(requestJson)
-    const game = withFreshPlayerCount(getGame(requiredText(request.gameId, 'gameId', 128)))
+    const gameId = requiredText(request.gameId, 'gameId', 128)
+    expireStaleAlivePlayers(gameId)
+    const game = withFreshPlayerCount(getGame(gameId))
     const token = cleanText(request.playerToken ?? request.player_token, 128)
     const player = token ? playerForToken(game.id, token) : null
     const players = playersForGame(game.id).filter(player => ['alive', 'dead'].includes(player.status))
@@ -111,6 +114,7 @@ export function joinLnq1Game(requestJson) {
     const request = parseJsonObject(requestJson)
     const game = getGame(requiredText(request.gameId, 'gameId', 128))
     if (game.status !== 'active') throw new Error('This arena is not active.')
+    expireStaleAlivePlayers(game.id)
     if (alivePlayersForGame(game.id).length >= MAX_PLAYERS) throw new Error('This arena is full.')
     const lnAddress = normalizeLnAddress(request.lnAddress ?? request.ln_address)
     const playerName = cleanText(request.name, 18) || 'PLAYER'
@@ -150,6 +154,7 @@ export function recordLnq1Payment(eventJson) {
     const existing = storage.get(PLAYERS_TABLE, paymentHash, null)
     if (existing) return {game: publicGame(withFreshPlayerCount(game)), player: publicPlayer(existing, true), status: existing.status}
     const paidAmount = Math.trunc(Math.abs(Number(event.amount || event.payment?.amount || 0)) / 1000) || Number(game.join_amount)
+    expireStaleAlivePlayers(game.id)
     const alivePlayers = alivePlayersForGame(game.id)
     if (alivePlayers.length >= MAX_PLAYERS) {
       const refused = makePlayer({paymentHash, game, lnAddress, playerName, playerToken, slot: 0, status: 'refund-pending', paidAmount})
@@ -174,7 +179,7 @@ export function leaveLnq1Game(requestJson) {
     const left = {
       ...player,
       status: 'left',
-      updated_at: system.now()
+      last_seen_at: system.now()
     }
     storage.set(PLAYERS_TABLE, left)
     const updatedGame = withFreshPlayerCount({...game, updated_at: system.now()})
@@ -189,6 +194,16 @@ export function leaveLnq1Game(requestJson) {
   })
 }
 
+export function heartbeatLnq1Game(requestJson) {
+  return runJson(() => {
+    const request = parseJsonObject(requestJson)
+    const game = getGame(requiredText(request.gameId, 'gameId', 128))
+    const player = requireAlivePlayer(game.id, requiredText(request.playerToken ?? request.player_token, 'playerToken', 128))
+    const touched = touchPlayer(player)
+    return {alive: true, player: publicPlayer(touched, true), game: publicGame(withFreshPlayerCount(game))}
+  })
+}
+
 export function declareLnq1Kill(requestJson) {
   return runJson(() => {
     const request = parseJsonObject(requestJson)
@@ -198,20 +213,31 @@ export function declareLnq1Kill(requestJson) {
     if (!victim || victim.game_id !== game.id || victim.status !== 'alive') throw new Error('Victim is not alive in this arena.')
     if (victim.id === killer.id) throw new Error('Self kills cannot be paid out.')
     const payoutAmount = Math.max(0, Number(victim.paid_amount || game.join_amount) - Number(game.haircut || 0))
-    const payout = payPlayer({
-      walletId: game.wallet_id,
-      lnAddress: killer.ln_address,
-      amount: payoutAmount,
-      comment: 'LNQ1 kill payout',
-      description: 'LNQ1 kill payout in ' + game.name,
-      extra: {lnq1_game_id: game.id, lnq1_killer_id: killer.id, lnq1_victim_id: victim.id}
-    })
+    const payout = payoutAmount > 0 ? payPlayer({
+        walletId: game.wallet_id,
+        lnAddress: killer.ln_address,
+        amount: payoutAmount,
+        comment: 'LNQ1 kill payout',
+        description: 'LNQ1 kill payout in ' + game.name,
+        extra: {lnq1_game_id: game.id, lnq1_killer_id: killer.id, lnq1_victim_id: victim.id}
+      }) : {
+        ok: true,
+        withheld: true,
+        amount: 0,
+        amountSat: 0,
+        amountMsat: 0,
+        amount_msat: 0,
+        error: '',
+        status: 'withheld'
+      }
+    payout.paidAmount = Number(victim.paid_amount || game.join_amount)
+    payout.haircut = Number(game.haircut || 0)
     const killed = {
       ...victim,
       status: 'dead',
       killer_id: killer.id,
       payout_amount: payoutAmount,
-      payout_status: payout.ok ? 'paid' : 'failed',
+      payout_status: payout.withheld ? 'withheld' : payout.ok ? 'paid' : 'failed',
       killed_at: system.now()
     }
     storage.set(PLAYERS_TABLE, killed)
@@ -236,6 +262,7 @@ export function publishLnq1State(requestJson) {
     const game = getGame(requiredText(request.gameId, 'gameId', 128))
     const player = requireAlivePlayer(game.id, requiredText(request.playerToken ?? request.player_token, 'playerToken', 128))
     const state = normalizePlayerState(request.state)
+    touchPlayer(player)
     publishGameMessage(game.id, {type: 'player_state', playerId: player.id, state, sentAt: system.now()})
     return {sent: true}
   })
@@ -292,6 +319,7 @@ function playersForGame(gameId, limit = 25) {
 }
 
 function alivePlayersForGame(gameId) {
+  expireStaleAlivePlayers(gameId)
   return storage.getPaginated(PLAYERS_TABLE, {filters: {game_id: gameId, status: 'alive'}, sortBy: 'paid_at', descending: false, limit: MAX_PLAYERS, offset: 0}).data
 }
 
@@ -300,9 +328,26 @@ function playerForToken(gameId, token) {
 }
 
 function requireAlivePlayer(gameId, token) {
+  expireStaleAlivePlayers(gameId)
   const player = playerForToken(gameId, token)
   if (!player || player.status !== 'alive') throw new Error('A live paid player token is required.')
   return player
+}
+
+function touchPlayer(player) {
+  const touched = {...player, last_seen_at: system.now()}
+  storage.set(PLAYERS_TABLE, touched)
+  return touched
+}
+
+function expireStaleAlivePlayers(gameId) {
+  const now = system.now()
+  for (const player of playersForGame(gameId, 100)) {
+    if (player.status !== 'alive') continue
+    const lastSeen = Number(player.last_seen_at || player.paid_at || player.created_at || 0)
+    if (lastSeen && now - lastSeen <= PRESENCE_TIMEOUT_SECONDS) continue
+    storage.set(PLAYERS_TABLE, {...player, status: 'left', last_seen_at: now})
+  }
 }
 
 function makePlayer({paymentHash, game, lnAddress, playerName, playerToken, slot, status, paidAmount}) {
@@ -322,7 +367,8 @@ function makePlayer({paymentHash, game, lnAddress, playerName, playerToken, slot
     payout_status: '',
     created_at: now,
     paid_at: ['alive', 'refund-pending'].includes(status) ? now : null,
-    killed_at: null
+    killed_at: null,
+    last_seen_at: status === 'alive' ? now : null
   }
 }
 
@@ -372,12 +418,7 @@ function refundPlayer(game, lnAddress, amount, gameId, reason) {
 }
 
 function publishGameMessage(gameId, data) {
-  try {
-    websocket.publish(gameChannel(gameId), data)
-    return true
-  } catch (_error) {
-    return false
-  }
+  return false
 }
 
 function gameChannel(gameId) {
@@ -453,7 +494,8 @@ function publicPlayer(player, includeId) {
     status: player.status || 'pending',
     paidAmount: Number(player.paid_amount || 0),
     paidAt: Number(player.paid_at || 0),
-    killedAt: Number(player.killed_at || 0)
+    killedAt: Number(player.killed_at || 0),
+    lastSeenAt: Number(player.last_seen_at || 0)
   }
 }
 

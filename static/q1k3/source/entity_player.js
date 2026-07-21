@@ -43,8 +43,8 @@ class entity_player_t extends entity_t {
 
 		// Mouse look
 		if (!controls_locked) {
-			this._pitch = clamp(this._pitch + mouse_y * m.value * (mi.checked ? -0.00015 : 0.00015), -1.5, 1.5);
-			this._yaw = (this._yaw + mouse_x * m.value * 0.00015) % (Math.PI*2);
+			this._pitch = clamp(this._pitch + mouse_y * m.value * (mi.checked ? -0.000234 : 0.000234), -1.5, 1.5);
+			this._yaw = (this._yaw + mouse_x * m.value * 0.000234) % (Math.PI*2);
 		}
 
 		// Acceleration in movement direction

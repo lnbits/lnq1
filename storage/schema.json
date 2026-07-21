@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "tables": {
     "lnq1_settings": {
       "fields": [
@@ -43,7 +43,8 @@
         {"name": "payout_status", "type": "string"},
         {"name": "created_at", "type": "datetime"},
         {"name": "paid_at", "type": "datetime", "nullable": true},
-        {"name": "killed_at", "type": "datetime", "nullable": true}
+        {"name": "killed_at", "type": "datetime", "nullable": true},
+        {"name": "last_seen_at", "type": "datetime", "nullable": true}
       ]
     }
   },

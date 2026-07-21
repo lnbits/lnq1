@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "description": "Track active LNQ1 player presence so abandoned paid slots can expire.",
+  "operations": [
+    {
+      "op": "add_field",
+      "table": "lnq1_players",
+      "field": "last_seen_at",
+      "type": "datetime",
+      "nullable": true
+    }
+  ]
+}

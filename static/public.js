@@ -2,6 +2,7 @@ const LNQ1_STATE_MS = 33
 const LNQ1_POLL_MS = 1200
 const LNQ1_KEEPALIVE_MS = 500
 const LNQ1_STALE_PLAYER_MS = 3500
+const LNQ1_HEARTBEAT_MS = 5000
 const LNQ1_SESSION_LN = 'lnq1.lnAddress'
 const LNQ1_SESSION_SATS = 'lnq1.satsTally'
 
@@ -11,10 +12,12 @@ const lnq1 = {
   game: null,
   gameId: gameIdFromUrl(),
   player: null,
+  players: [],
   playerToken: '',
   realtime: null,
   realtimeSend: null,
   stateTimer: null,
+  heartbeatTimer: null,
   staleTimer: null,
   pollTimer: null,
   sequence: 0,
@@ -25,6 +28,8 @@ const lnq1 = {
   stats: {sent: 0, received: 0, httpFallbacks: 0, websocketErrors: 0},
   killed: new Set(),
   rewarded: new Set(),
+  announcedPlayers: new Set(),
+  rosterSynced: false,
   session: {},
   respawning: false,
   ready: null
@@ -88,17 +93,18 @@ window.LNQ1_MULTIPLAYER = {
     this.applySpawn()
     renderSessionHud()
     startStateLoop()
+    startHeartbeatLoop()
   },
   canPlay() {
     return lnq1.player?.status === 'alive'
   },
   spawnPoint(fallback) {
     const spawns = [
-      [768, 80, 2304, Math.PI * 0.5],
-      [3136, 80, 2304, -Math.PI * 0.5],
-      [2048, 80, 896, Math.PI],
-      [2048, 80, 3200, 0],
-      [2048, 80, 2304, 0]
+      [896, 96, 2048, Math.PI * 0.5],
+      [3200, 96, 2048, -Math.PI * 0.5],
+      [2048, 96, 1216, Math.PI],
+      [2048, 96, 2944, 0],
+      [1408, 96, 2944, Math.PI * 0.25]
     ]
     const slot = Math.max(1, Math.min(spawns.length, Number(lnq1.player?.slot || 1)))
     const spawn = spawns[slot - 1] || spawns[0]
@@ -117,12 +123,15 @@ window.LNQ1_MULTIPLAYER = {
     if (lnq1.respawning) return
     lnq1.respawning = true
     lnq1.player = {...(lnq1.player || {}), status: 'dead'}
+    if (lnq1.heartbeatTimer) window.clearInterval(lnq1.heartbeatTimer)
+    lnq1.heartbeatTimer = null
     clearPlayerToken()
     window.setTimeout(() => {
       ui_show_join(() => {
         lnq1.respawning = false
         this.applySpawn()
         startStateLoop()
+        startHeartbeatLoop()
       })
     }, 800)
   },
@@ -143,16 +152,35 @@ window.LNQ1_MULTIPLAYER = {
         playerToken: lnq1.playerToken,
         victimPlayerId
       })
-      window.game_remove_remote_player?.(victimPlayerId)
       if (result?.victim || result?.killer) {
-        addFeed(playerLabel(result.victim) + ' was fragged by ' + playerLabel(result.killer))
+        addFeed(playerLabel(result.killer) + ' just fragged ' + playerLabel(result.victim))
       }
       showKillReward(victimPlayerId, result?.payout)
       if (result?.payout?.ok) {
         addSats(payoutSats(result.payout))
+        console.log('[lnq1] payout tally updated', result.payout)
       }
+      window.game_remove_remote_player?.(victimPlayerId)
+      sendRealtime({
+        type: 'player_killed',
+        killerId: result?.killer?.id || lnq1.player?.id || '',
+        victimId: victimPlayerId,
+        killer: result?.killer || lnq1.player,
+        victim: result?.victim || null,
+        payout: result?.payout || null
+      }).catch(() => {})
     } catch (error) {
-      lnq1.killed.delete(victimPlayerId)
+      await refreshGame().catch(() => {})
+      const victim = lnq1.players.find(player => player.id === victimPlayerId)
+      if (victim?.status === 'dead') {
+        lnq1.rewarded.add(victimPlayerId)
+        window.game_remove_remote_player?.(victimPlayerId)
+        const fallbackAmount = Math.max(0, Number(victim.paidAmount || lnq1.game?.joinAmount || 0) - Number(lnq1.game?.haircut || 0))
+        if (fallbackAmount > 0) addSats(fallbackAmount)
+        addFeed(playerLabel(lnq1.player) + ' just fragged ' + playerLabel(victim))
+      } else {
+        lnq1.killed.delete(victimPlayerId)
+      }
       console.warn('[lnq1] kill report failed', error)
     }
   }
@@ -178,9 +206,23 @@ async function initLnq1() {
 
 async function refreshGame() {
   if (!lnq1.gameId) return
+  const previousPlayer = lnq1.player
+  const previousAlive = new Set((lnq1.players || []).filter(player => player?.status === 'alive').map(player => player.id))
   const response = await api().getPublicGame(lnq1.gameId, lnq1.playerToken)
   lnq1.game = response.game || null
   lnq1.player = response.player || null
+  lnq1.players = Array.isArray(response.players) ? response.players : []
+  announceJoinedPlayers(previousAlive)
+  renderPlayersHud()
+  for (const player of lnq1.players) {
+    if (player?.id && ['dead', 'left'].includes(player.status)) {
+      window.game_remove_remote_player?.(player.id)
+      lnq1.announcedPlayers.delete(player.id)
+    }
+  }
+  if (previousPlayer?.status === 'alive' && lnq1.player?.status === 'dead' && window.game_entity_player && !window.game_entity_player._dead) {
+    window.game_entity_player._kill()
+  }
 }
 
 async function waitForPaidPlayer(playerToken) {
@@ -206,6 +248,19 @@ async function configureRealtime() {
 function startStateLoop() {
   if (lnq1.stateTimer) return
   lnq1.stateTimer = window.setInterval(publishLocalState, LNQ1_STATE_MS)
+}
+
+function startHeartbeatLoop() {
+  if (lnq1.heartbeatTimer) return
+  publishHeartbeat().catch(error => console.warn('[lnq1] heartbeat failed', error))
+  lnq1.heartbeatTimer = window.setInterval(() => {
+    publishHeartbeat().catch(error => console.warn('[lnq1] heartbeat failed', error))
+  }, LNQ1_HEARTBEAT_MS)
+}
+
+async function publishHeartbeat() {
+  if (!lnq1.playerToken || !lnq1.gameId || lnq1.player?.status !== 'alive') return
+  await api().heartbeatGame(lnq1.gameId, {playerToken: lnq1.playerToken})
 }
 
 async function publishLocalState() {
@@ -252,16 +307,17 @@ function handleRealtime(event) {
     if (sequence) lnq1.remoteSequences[data.playerId] = sequence
     lnq1.remoteLastSeen[data.playerId] = Date.now()
     lnq1.stats.received += 1
+    renderPlayersHud()
     window.game_apply_remote_snapshot?.(data.playerId, data.state)
     return
   }
   if (data.type === 'player_paid') {
-    addFeed(playerLabel(data.player) + ' joined the party!')
+    addFeed(playerLabel(data.player) + ' has joined the game')
     refreshGame().catch(error => console.warn('[lnq1] refresh failed', error))
     return
   }
   if (data.type === 'player_killed') {
-    addFeed(playerLabel(data.victim) + ' was fragged by ' + playerLabel(data.killer))
+    addFeed(playerLabel(data.killer) + ' just fragged ' + playerLabel(data.victim))
     if (data.killerId === lnq1.player?.id) {
       const firstReward = !data.victimId || !lnq1.rewarded.has(data.victimId)
       showKillReward(data.victimId, data.payout)
@@ -320,11 +376,25 @@ function addFeed(message) {
   while (feed.children.length > 5) {
     feed.lastChild.remove()
   }
-  window.setTimeout(() => line.remove(), 8000)
+  window.setTimeout(() => line.remove(), 5000)
 }
 
 function playerLabel(player) {
   return player?.lnAddress || player?.name || 'Someone'
+}
+
+function announceJoinedPlayers(previousAlive) {
+  const alivePlayers = (lnq1.players || []).filter(player => player?.id && player.status === 'alive')
+  if (!lnq1.rosterSynced) {
+    for (const player of alivePlayers) lnq1.announcedPlayers.add(player.id)
+    lnq1.rosterSynced = true
+    return
+  }
+  for (const player of alivePlayers) {
+    if (previousAlive.has(player.id) || lnq1.announcedPlayers.has(player.id)) continue
+    lnq1.announcedPlayers.add(player.id)
+    addFeed(playerLabel(player) + ' has joined the game')
+  }
 }
 
 function addSats(amount) {
@@ -340,8 +410,38 @@ function updateSatsHud() {
   earn.textContent = amount + 'sats'
 }
 
+function renderPlayersHud() {
+  const players = document.getElementById('players')
+  if (!players) return
+  const now = Date.now()
+  const seenAddresses = new Set()
+  const alivePlayers = (lnq1.players || []).filter(player => {
+    if (player?.status !== 'alive') return false
+    const label = playerLabel(player)
+    if (seenAddresses.has(label)) return false
+    const isMe = player?.id && player.id === lnq1.player?.id
+    const recentlySeen = player?.id && now - Number(lnq1.remoteLastSeen[player.id] || 0) <= LNQ1_STALE_PLAYER_MS
+    if (!isMe && !recentlySeen) return false
+    seenAddresses.add(label)
+    return true
+  })
+  if (!alivePlayers.length) {
+    players.innerHTML = ''
+    return
+  }
+  players.innerHTML = alivePlayers.map(player => {
+    const isMe = player?.id && player.id === lnq1.player?.id
+    const slot = Number(player?.slot || 0)
+    return '<div class="' + (isMe ? 'me' : '') + '">' +
+      (slot ? '<span class="slot">' + slot + '</span> ' : '') +
+      escapeHtml(playerLabel(player)) +
+      '</div>'
+  }).join('')
+}
+
 function renderSessionHud() {
   updateSatsHud()
+  renderPlayersHud()
 }
 
 async function copyInvoice(paymentRequest, status) {
@@ -466,12 +566,15 @@ function pruneStalePlayers() {
       window.game_remove_remote_player?.(playerId)
       delete lnq1.remoteSequences[playerId]
       delete lnq1.remoteLastSeen[playerId]
+      renderPlayersHud()
     }
   }
 }
 
 function leaveGame() {
   if (!lnq1.playerToken || !lnq1.gameId || lnq1.player?.status !== 'alive') return
+  if (lnq1.heartbeatTimer) window.clearInterval(lnq1.heartbeatTimer)
+  lnq1.heartbeatTimer = null
   const token = lnq1.playerToken
   lnq1.playerToken = ''
   api().leaveGame(lnq1.gameId, {playerToken: token}).catch(() => {})
@@ -481,6 +584,7 @@ function cleanup() {
   leaveGame()
   if (lnq1.realtime) lnq1.realtime()
   if (lnq1.stateTimer) window.clearInterval(lnq1.stateTimer)
+  if (lnq1.heartbeatTimer) window.clearInterval(lnq1.heartbeatTimer)
   if (lnq1.staleTimer) window.clearInterval(lnq1.staleTimer)
   if (lnq1.pollTimer) window.clearInterval(lnq1.pollTimer)
 }

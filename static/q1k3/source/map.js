@@ -173,10 +173,10 @@ map_block_at_box = (box_start, box_end) => {
 },
 
 map_find_open_spawn = (preferred) => {
-	let size = vec3(14, 26, 14),
+	let size = vec3(18, 44, 18),
 		is_open = (p) => !map_block_at_box(vec3_sub(p, size), vec3_add(p, size)),
-		y_offsets = [0, 16, 32, 48, 64],
-		radii = [0, 64, 128, 192, 256, 384, 512];
+		y_offsets = [0, 16, 32, 48, 64, 96],
+		radii = [0, 96, 192, 288, 384, 512, 640];
 
 	for (let r of radii) {
 		for (let oy of y_offsets) {

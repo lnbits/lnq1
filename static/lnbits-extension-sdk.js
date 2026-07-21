@@ -104,6 +104,13 @@
         })
       },
 
+      heartbeatGame(gameId, payload) {
+        return request(`${baseUrl}/games/${encodeURIComponent(gameId)}/heartbeat`, {
+          method: 'POST',
+          body: payload
+        })
+      },
+
       declareWinner(gameId, payload) {
         return request(`${baseUrl}/games/${encodeURIComponent(gameId)}/winner`, {
           method: 'POST',

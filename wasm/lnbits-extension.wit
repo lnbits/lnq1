@@ -335,6 +335,8 @@ world lnq1 {
   export delete-lnq1-game: func(request-json: string) -> string;
   export get-public-lnq1-game: func(request-json: string) -> string;
   export join-lnq1-game: func(request-json: string) -> string;
+  export leave-lnq1-game: func(request-json: string) -> string;
+  export heartbeat-lnq1-game: func(request-json: string) -> string;
   export declare-lnq1-kill: func(request-json: string) -> string;
   export publish-lnq1-state: func(request-json: string) -> string;
   export publish-lnq1-chat: func(request-json: string) -> string;

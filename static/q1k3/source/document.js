@@ -12,8 +12,10 @@ document.body.innerHTML +=
 		'#msg{position:absolute;top:8vw;left:0;right:0;font-size:1.2vw;display:none;}'+
 		'#a,#h{position:absolute;bottom:3%;left:20%;right:0;font-size:3.2vw;}'+
 		'#h{left:-20%;}'+
-		'#feed{position:absolute;right:12px;bottom:12px;max-width:46%;padding:6px 8px;background:#0008;border:2px solid #ffffff33;font-size:14px;text-align:right;color:#eee;text-shadow:2px 2px #000;line-height:1.35;}'+
+		'#feed{position:absolute;left:12px;bottom:12px;max-width:46%;padding:6px 8px;background:#0008;border:2px solid #ffffff33;font-size:14px;text-align:left;color:#eee;text-shadow:2px 2px #000;line-height:1.35;}'+
 		'#earn{position:absolute;right:12px;top:12px;padding:5px 8px;background:#0008;border:2px solid #ffffff33;font-size:18px;color:#fff;text-shadow:2px 2px #000;}'+
+		'#players{position:absolute;left:12px;top:12px;min-width:150px;max-width:36%;padding:6px 8px;background:#0008;border:2px solid #ffffff33;font-size:13px;color:#eee;text-align:left;text-shadow:2px 2px #000;line-height:1.35;}'+
+		'#players:empty{display:none;}'+
 		'h1{position:absolute;bottom:11%;left:0;right:0;font-size:9vw;margin:0;}'+
 		'#st{position:absolute;bottom:6%;left:0;right:0;}'+
 		'#join,#cf{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;z-index:3;}'+
@@ -36,7 +38,7 @@ document.body.innerHTML +=
 		'<div id="ts"><h1>LNQ1 ARENA</h1><div id="st">CLICK TO START</div></div>'+
 		'<div id="h"></div><div id="a"></div>'+
 		'<div id="msg"></div>'+
-		'<div id="feed"></div><div id="earn"></div>'+
+		'<div id="players"></div><div id="feed"></div><div id="earn"></div>'+
 	'</div>';
 
 let ui_player_name = '',

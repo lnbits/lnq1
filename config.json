@@ -20,6 +20,7 @@
       {"name": "get-public-lnq1-game", "visibility": "public"},
       {"name": "join-lnq1-game", "visibility": "public"},
       {"name": "leave-lnq1-game", "visibility": "public"},
+      {"name": "heartbeat-lnq1-game", "visibility": "public"},
       {"name": "declare-lnq1-kill", "visibility": "public"},
       {"name": "publish-lnq1-state", "visibility": "public"},
       {"name": "publish-lnq1-chat", "visibility": "public"},
@@ -84,6 +85,14 @@
     },
     {
       "method": "POST",
+      "path": "/games/{game_id}/heartbeat",
+      "export": "heartbeat-lnq1-game",
+      "auth": "public",
+      "path_params": {"game_id": "gameId"},
+      "ownerContext": {"table": "lnq1_games", "idParam": "gameId"}
+    },
+    {
+      "method": "POST",
       "path": "/games/{game_id}/winner",
       "export": "declare-lnq1-kill",
       "auth": "public",
@@ -125,11 +134,6 @@
     },
     {"id": "wallet.pay_invoice", "description": "Pay LNQ1 kill payouts to Lightning addresses."},
     {"id": "wallet.pay_invoice_background", "description": "Pay LNQ1 kill payouts from an owner-approved wallet."},
-    {
-      "id": "websocket.publish",
-      "description": "Broadcast LNQ1 movement, shots, joins, deaths, and chat through LNbits.",
-      "policies": [{"max_messages_per_second": 180}]
-    },
     {"id": "websocket.subscribe", "description": "Subscribe LNQ1 players to arena realtime updates."}
   ]
 }
