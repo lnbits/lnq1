@@ -1,6 +1,9 @@
 {
-  "name": "LNQ1 Arena",
-  "short_description": "Paid multiplayer FPS arena.",
-  "tile": "/lnq1/static/assets/tile.svg",
-  "contributors": ["LNbits", "q1k3"]
+  "repos": [
+    {
+      "id": "lnq1",
+      "organisation": "lnbits",
+      "repository": "lnq1"
+    }
+  ]
 }
