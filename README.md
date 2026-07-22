@@ -1,63 +1,82 @@
-# StreetFighter
+# LNQ1 Arena
 
-StreetFighter is an LNbits WebAssembly extension for paid public fighting game
-matches. An LNbits user enables the extension, chooses a payout haircut, creates
-a match with a join amount, and shares the public match link. Two players enter
-Lightning addresses and pay invoices to join. The winner receives the pot minus
-the configured haircut.
+LNQ1 is an LNbits WebAssembly extension for paid multiplayer Quake 1
+deathmatches in the browser. An arena owner selects an LNbits wallet, chooses a
+payout haircut, sets the entry price, and shares the public arena link. Players
+enter a Lightning address and pay an invoice to join the live match.
 
-The public page includes the StreetFighter canvas game from
-`/home/ben/Projects/StreetFighter`, a join flow, a player list, and a troll box.
-Realtime move updates and troll-box sync are intentionally left as placeholders
-until LNbits core exposes websocket support for WASM extensions.
+Each frag transfers the defeated player's entry stake to the killer, minus the
+arena's configured haircut. Payouts are attempted immediately to the killer's
+Lightning address. Arenas remain open for new players and support up to five
+simultaneous paid players.
 
-## Extension Details
+The public page embeds the Quake game, displays the current players and local
+sats total, and includes a live activity feed. Player movement and game state
+are synchronized over LNbits extension websockets, with HTTP fallback when a
+websocket send fails. Heartbeats remove stale players from the active roster.
 
-- Extension ID: `streetfighterwasm`
+## Extension details
+
+- Extension ID: `lnq1`
 - Extension type: `wasm`
-- Minimum LNbits version: `1.5.5`
-- Admin route: `/ext/streetfighterwasm`
-- Public game route: `/ext/streetfighterwasm/games/{game_id}`
+- Minimum LNbits version: `1.5.6`
+- Admin route: `/ext/lnq1`
+- Public arena route: `/ext/lnq1/games/{game_id}`
 - WASM module: `wasm/module.wasm`
+- Maximum active players per arena: 5
+- Minimum entry price: 50 sats, with no maximum imposed by LNQ1
+
+## Gameplay and payments
+
+1. Open LNQ1 in LNbits and select the wallet used for entry payments and kill
+   payouts.
+2. Enable arenas and choose the default haircut percentage.
+3. Create an arena with a title and entry price, then share its public link.
+4. Each player supplies a Lightning address and pays the generated invoice.
+5. Once payment settles, the player's private token admits them to the arena.
+6. Player state, movement, joins, departures, and frags are synchronized with
+   the other connected players.
+7. When a player is fragged, their paid entry amount minus the percentage
+   haircut is paid immediately to the killer's Lightning address.
+8. The defeated player leaves the active roster and may pay to join again.
+
+For example, with a 100-sat entry and a 10% haircut, a successful frag pays 90
+sats to the killer.
 
 ## Permissions
 
-This extension requests:
+LNQ1 requests the following extension capabilities:
 
-- `ext.storage.read` and `ext.storage.write` for settings, games, players, and
+- Storage read and write access for settings, arenas, players, presence, and
   payout state.
-- `ext.storage.read_public` for the public match page.
-- `wallet.list` so the admin UI can use the installing user's wallet.
-- `wallet.create_invoice_public` to create public join invoices.
-- `wallet.pay_invoice` to pay the winner's Lightning address.
+- Wallet listing so the arena owner can choose an LNbits wallet.
+- Public invoice creation for player entry payments.
+- Invoice payment and background-payment permission for automatic kill
+  payouts to Lightning addresses.
+- Websocket subscription for realtime multiplayer messages.
 
-## Current Flow
+Background-payment authorization is optional until an automatic payout is
+required. The approved maximum must be large enough for the arena's possible
+kill payout.
 
-1. Open the StreetFighter extension in LNbits.
-2. Enable matches, choose the wallet, and set the haircut percentage.
-3. Create a match with a title and join amount.
-4. Share the public match link with two players.
-5. Each player enters a Lightning address and pays the join invoice.
-6. Settled payments assign the first player to Ryu and the second to Ken.
-7. The public page starts the local canvas fight once a paid player opens their
-   private player-token URL.
-8. For now, the page can record the local player's win and the admin can settle
-   payout from the games table.
+## Build and checks
 
-Both sides use the player-1 controls because the intended realtime version will
-run each player on a separate device. Until websocket support is added, movement
-and chat are local placeholders rather than synchronized state.
-
-## Build
-
-From this extension's development directory:
+From the extension development directory:
 
 ```bash
-cd lnbits/extensions/streetfighterwasm/dev
+cd lnbits/extensions/lnq1/dev
+npm run check
 npm run build:wasm
 ```
 
-The build writes the installable component to `../wasm/module.wasm`.
+The WASM build writes the installable component to `../wasm/module.wasm`.
 
-Static UI changes in `static/` do not require a WASM rebuild, but LNbits or the
-browser may need a hard refresh to pick up changed assets.
+After changing the browser game source under `static/game/src`, rebuild the
+browser bundle separately:
+
+```bash
+npm run build:game
+```
+
+Other static UI changes do not require a WASM rebuild, although the browser may
+need a hard refresh before it loads updated assets.
