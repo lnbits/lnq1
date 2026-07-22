@@ -2,7 +2,7 @@
   "id": "lnq1",
   "name": "LNQ1 Arena",
   "short_description": "A paid multiplayer FPS arena where players win entry fees by scoring kills.",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "min_lnbits_version": "1.5.6",
   "tile": "/lnq1/static/assets/tile.svg",
   "tags": ["gaming", "quake", "wasm", "lightning"],
