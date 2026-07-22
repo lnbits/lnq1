@@ -1,4 +1,5 @@
 const client = window.createLNbitsExtensionClient({extensionId: 'lnq1'})
+const MIN_JOIN_SATS = 50
 
 const app = Vue.createApp({
   data() {
@@ -6,7 +7,9 @@ const app = Vue.createApp({
       loading: false,
       saving: false,
       creating: false,
+      authorizingPayouts: false,
       deletingGameId: '',
+      deleteDialog: {show: false, game: null},
       settings: {enabled: false, haircut: 0, walletId: ''},
       gameForm: {name: 'LNQ1 public arena', joinAmount: 100},
       wallets: [],
@@ -33,7 +36,10 @@ const app = Vue.createApp({
       return !this.settings.enabled || !!this.effectiveWalletId
     },
     canCreate() {
-      return this.settings.enabled && this.effectiveWalletId && this.gameForm.name && Number(this.gameForm.joinAmount) > 0
+      return this.settings.enabled && this.effectiveWalletId && this.gameForm.name && Number.isSafeInteger(Number(this.gameForm.joinAmount)) && Number(this.gameForm.joinAmount) >= MIN_JOIN_SATS
+    },
+    canAuthorizePayouts() {
+      return this.settings.enabled && this.effectiveWalletId && Number.isSafeInteger(Number(this.gameForm.joinAmount)) && Number(this.gameForm.joinAmount) >= MIN_JOIN_SATS
     }
   },
   async mounted() {
@@ -71,15 +77,32 @@ const app = Vue.createApp({
       if (!this.canCreate) return
       this.creating = true
       try {
-        await client.requestBackgroundPaymentPermission({
-          walletId: this.effectiveWalletId,
-          maxAmount: Math.max(1, Number(this.gameForm.joinAmount || 1)),
-          destinationPolicy: 'external_allowed'
-        })
+        await this.ensurePayoutPermission()
         await client.createGame({name: this.gameForm.name, joinAmount: Number(this.gameForm.joinAmount)})
         this.notify('Arena created.', 'positive')
         await this.fetchGames()
       } catch (error) { this.showError(error) } finally { this.creating = false }
+    },
+    payoutPermissionGrant() {
+      return {
+        walletId: this.effectiveWalletId,
+        maxAmount: Math.max(1, Number(this.gameForm.joinAmount || 1)),
+        destinationPolicy: 'external_allowed'
+      }
+    },
+    async ensurePayoutPermission(options = {}) {
+      return await client.requestBackgroundPaymentPermission(
+        this.payoutPermissionGrant(),
+        options
+      )
+    },
+    async authorizePayouts() {
+      if (!this.canAuthorizePayouts) return
+      this.authorizingPayouts = true
+      try {
+        await this.ensurePayoutPermission({forcePrompt: true})
+        this.notify('Payout permission saved.', 'positive')
+      } catch (error) { this.showError(error) } finally { this.authorizingPayouts = false }
     },
     async fetchGames(props = {}) {
       const pagination = props.pagination || this.pagination
@@ -101,11 +124,14 @@ const app = Vue.createApp({
       await navigator.clipboard?.writeText(this.publicUrl(game))
       this.notify('Arena link copied.', 'positive')
     },
+    requestDeleteGame(game) {
+      this.deleteDialog = {show: true, game}
+    },
     async deleteGame(game) {
-      if (!window.confirm('Delete "' + game.name + '"?')) return
       this.deletingGameId = game.id
       try {
         await client.deleteGame(game.id)
+        this.deleteDialog = {show: false, game: null}
         await this.fetchGames()
       } catch (error) { this.showError(error) } finally { this.deletingGameId = '' }
     },
@@ -120,6 +146,18 @@ const app = Vue.createApp({
     const h = Vue.h
     const q = name => Quasar[name]
     return h('main', {class: 'admin-shell q-pa-md'}, [
+      h(q('QDialog'), {modelValue: this.deleteDialog.show, 'onUpdate:modelValue': v => this.deleteDialog.show = v}, () => [
+        h(q('QCard'), {dark: true, style: 'width: min(420px, calc(100vw - 32px))'}, () => [
+          h(q('QCardSection'), () => [
+            h('h2', {class: 'text-h6 text-weight-bold q-my-none'}, 'Delete Arena')
+          ]),
+          h(q('QCardSection'), {class: 'q-pt-none'}, () => 'Delete "' + (this.deleteDialog.game?.name || 'this arena') + '"?'),
+          h(q('QCardActions'), {align: 'right'}, () => [
+            h(q('QBtn'), {flat: true, color: 'primary', label: 'Cancel', onClick: () => this.deleteDialog = {show: false, game: null}}),
+            h(q('QBtn'), {unelevated: true, color: 'negative', label: 'Delete', loading: this.deletingGameId === this.deleteDialog.game?.id, onClick: () => this.deleteGame(this.deleteDialog.game)})
+          ])
+        ])
+      ]),
       h('header', {class: 'row items-center q-gutter-md q-mb-md'}, [
         h('div', {class: 'streetfighter-mark'}, 'LN'),
         h('div', [
@@ -133,25 +171,28 @@ const app = Vue.createApp({
             h('h2', {class: 'text-h6 text-weight-bold q-my-none q-mb-md'}, 'Settings'),
             h(q('QToggle'), {modelValue: this.settings.enabled, 'onUpdate:modelValue': v => this.settings.enabled = v, label: 'Enable paid arenas', color: 'primary'}),
             h(q('QSelect'), {class: 'q-mt-md', modelValue: this.effectiveWalletId, 'onUpdate:modelValue': v => this.settings.walletId = v, options: this.wallets.map(w => ({label: w.name, value: w.id})), label: 'Wallet', filled: true, dense: true, dark: true, optionsDark: true, emitValue: true, mapOptions: true}),
-            h(q('QInput'), {class: 'q-mt-sm', modelValue: this.settings.haircut, 'onUpdate:modelValue': v => this.settings.haircut = v, type: 'number', label: 'Haircut sats per kill', filled: true, dense: true, dark: true, min: 0}),
+          h(q('QInput'), {class: 'q-mt-sm', modelValue: this.settings.haircut, 'onUpdate:modelValue': v => this.settings.haircut = v, type: 'number', label: 'Haircut percent', filled: true, dense: true, dark: true, min: 0, max: 100}),
             h(q('QBtn'), {class: 'q-mt-md', color: 'primary', loading: this.saving, disable: !this.canSave, onClick: this.saveSettings}, () => 'Save Settings')
           ])),
           h(q('QCard'), {dark: true}, () => h(q('QCardSection'), () => [
             h('h2', {class: 'text-h6 text-weight-bold q-my-none q-mb-md'}, 'New Arena'),
             h(q('QInput'), {modelValue: this.gameForm.name, 'onUpdate:modelValue': v => this.gameForm.name = v, label: 'Title', filled: true, dense: true, dark: true}),
-            h(q('QInput'), {class: 'q-mt-sm', modelValue: this.gameForm.joinAmount, 'onUpdate:modelValue': v => this.gameForm.joinAmount = v, type: 'number', label: 'Join sats', filled: true, dense: true, dark: true, min: 1}),
+            h(q('QInput'), {class: 'q-mt-sm', modelValue: this.gameForm.joinAmount, 'onUpdate:modelValue': v => this.gameForm.joinAmount = v, type: 'number', label: 'Join sats (minimum 50)', filled: true, dense: true, dark: true, min: MIN_JOIN_SATS}),
             h(q('QBtn'), {class: 'q-mt-md', color: 'primary', loading: this.creating, disable: !this.canCreate, onClick: this.createGame}, () => 'Create Arena')
           ]))
         ]),
         h('div', {class: 'col-12 col-md-7'}, [
           h(q('QCard'), {dark: true}, () => h(q('QCardSection'), () => [
-            h('h2', {class: 'text-h6 text-weight-bold q-my-none q-mb-md'}, 'Arenas'),
+            h('div', {class: 'row items-center justify-between q-mb-md'}, [
+              h('h2', {class: 'text-h6 text-weight-bold q-my-none'}, 'Arenas'),
+              h(q('QBtn'), {color: 'primary', outline: true, loading: this.authorizingPayouts, disable: !this.canAuthorizePayouts, onClick: this.authorizePayouts}, () => 'Authorize Payouts')
+            ]),
             h(q('QTable'), {dark: true, flat: true, rows: this.games, columns: this.columns, rowKey: 'id', pagination: this.pagination, loading: this.loading, onRequest: this.fetchGames}, {
               'body-cell-players': props => h(q('QTd'), {props}, () => props.row.playersCount + ' / 5'),
-              'body-cell-haircut': props => h(q('QTd'), {props}, () => props.row.haircut + ' sats'),
+              'body-cell-haircut': props => h(q('QTd'), {props}, () => props.row.haircut + '%'),
               'body-cell-actions': props => h(q('QTd'), {props, class: 'q-gutter-xs'}, () => [
                 h(q('QBtn'), {flat: true, round: true, dense: true, icon: 'content_copy', onClick: () => this.copyGame(props.row)}),
-                h(q('QBtn'), {flat: true, round: true, dense: true, color: 'negative', icon: 'delete', loading: this.deletingGameId === props.row.id, onClick: () => this.deleteGame(props.row)})
+                h(q('QBtn'), {flat: true, round: true, dense: true, color: 'negative', icon: 'delete', loading: this.deletingGameId === props.row.id, onClick: () => this.requestDeleteGame(props.row)})
               ])
             })
           ]))

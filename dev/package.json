@@ -6,7 +6,7 @@
     "build": "npm run build:wasm",
     "build:game": "node scripts/bundle-browser-game.mjs",
     "build:wasm": "node scripts/bundle.mjs && npx --yes @bytecodealliance/jco componentize dist/index.bundle.js --disable all --enable clocks --enable random --enable stdio --wit ../wasm/lnbits-extension.wit --world-name lnq1 -o ../wasm/module.wasm",
-    "check": "node --check src/index.js"
+    "check": "node --check src/index.js && node --check src/lnbits-sdk.js && node --check ../static/admin.js && node --check ../static/public.js && node test/index.test.js && node test/public.test.js"
   },
   "devDependencies": {
     "@bytecodealliance/jco": "^1.10.1"

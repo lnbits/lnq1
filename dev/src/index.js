@@ -5,6 +5,7 @@ const GAMES_TABLE = 'lnq1_games'
 const PLAYERS_TABLE = 'lnq1_players'
 const SETTINGS_ID = 'lnq1-settings'
 const MAX_PLAYERS = 5
+const MIN_JOIN_SATS = 50
 const PRESENCE_TIMEOUT_SECONDS = 45
 const GAME_SEARCH_FIELDS = ['name', 'status']
 
@@ -22,7 +23,7 @@ export function saveLnq1Settings(requestJson) {
       wallet_id: cleanText(request.walletId ?? request.wallet_id, 128),
       wallet_name: cleanText(request.walletName ?? request.wallet_name, 120),
       enabled: request.enabled === true,
-      haircut: normalizeInteger(request.haircut, 0, 0, 100000000),
+      haircut: normalizeInteger(request.haircut, 0, 0, 100),
       created_at: existing.created_at || now,
       updated_at: now
     }
@@ -48,8 +49,13 @@ export function createLnq1Game(requestJson) {
       settings_id: settings.id,
       wallet_id: settings.wallet_id,
       name: cleanText(request.name, 80) || 'LNQ1 public arena',
-      join_amount: normalizeInteger(request.joinAmount ?? request.join_amount, 100, 1, 100000000),
-      haircut: normalizeInteger(request.haircut ?? settings.haircut, settings.haircut, 0, 100000000),
+      join_amount: normalizeInteger(
+        request.joinAmount ?? request.join_amount,
+        100,
+        MIN_JOIN_SATS,
+        Number.MAX_SAFE_INTEGER
+      ),
+      haircut: normalizeInteger(request.haircut ?? settings.haircut, settings.haircut, 0, 100),
       players_count: 0,
       max_players: MAX_PLAYERS,
       status: 'active',
@@ -212,11 +218,14 @@ export function declareLnq1Kill(requestJson) {
     const victim = storage.get(PLAYERS_TABLE, requiredText(request.victimPlayerId ?? request.victim_player_id, 'victimPlayerId', 128), null)
     if (!victim || victim.game_id !== game.id || victim.status !== 'alive') throw new Error('Victim is not alive in this arena.')
     if (victim.id === killer.id) throw new Error('Self kills cannot be paid out.')
-    const payoutAmount = Math.max(0, Number(victim.paid_amount || game.join_amount) - Number(game.haircut || 0))
+    const paidAmount = Number(victim.paid_amount || game.join_amount)
+    const haircutPercent = Number(game.haircut || 0)
+    const payoutAmount = Math.max(0, Math.floor(paidAmount * (100 - haircutPercent) / 100))
     const payout = payoutAmount > 0 ? payPlayer({
         walletId: game.wallet_id,
         lnAddress: killer.ln_address,
         amount: payoutAmount,
+        maxAmount: paidAmount,
         comment: 'LNQ1 kill payout',
         description: 'LNQ1 kill payout in ' + game.name,
         extra: {lnq1_game_id: game.id, lnq1_killer_id: killer.id, lnq1_victim_id: victim.id}
@@ -230,13 +239,13 @@ export function declareLnq1Kill(requestJson) {
         error: '',
         status: 'withheld'
       }
-    payout.paidAmount = Number(victim.paid_amount || game.join_amount)
-    payout.haircut = Number(game.haircut || 0)
+    payout.paidAmount = paidAmount
+    payout.haircut = haircutPercent
     const killed = {
       ...victim,
       status: 'dead',
       killer_id: killer.id,
-      payout_amount: payoutAmount,
+      payout_amount: Number(payout.amount || payoutAmount),
       payout_status: payout.withheld ? 'withheld' : payout.ok ? 'paid' : 'failed',
       killed_at: system.now()
     }
@@ -382,18 +391,25 @@ function withFreshPlayerCount(game) {
   return {...game, players_count: alivePlayersForGame(game.id).length, max_players: MAX_PLAYERS}
 }
 
-function payPlayer({walletId, lnAddress, amount, comment, description, extra}) {
+function payPlayer({walletId, lnAddress, amount, maxAmount = amount, comment, description, extra}) {
   if (!Number.isInteger(amount) || amount <= 0) return {ok: false, error: 'Payout amount must be greater than zero.'}
   if (!walletId) return {ok: false, error: 'LNQ1 wallet is not configured.'}
   if (!lnAddress) return {ok: false, error: 'Lightning address is missing.'}
-  const response = wallet.payLnurl({walletId, lnurl: lnAddress, amount, currency: 'sat', comment, maxSat: amount, description, extra})
-  const amountMsat = Number(response.amountMsat ?? response.amount_msat ?? 0) || amount * 1000
+  let paidAmount = amount
+  let response = wallet.payLnurl({walletId, lnurl: lnAddress, amount: paidAmount, currency: 'sat', comment, maxSat: paidAmount, description, extra})
+  const minimumAmount = minimumLnurlAmountSats(response.error)
+  if (response.ok !== true && minimumAmount > paidAmount && minimumAmount <= maxAmount) {
+    paidAmount = minimumAmount
+    response = wallet.payLnurl({walletId, lnurl: lnAddress, amount: paidAmount, currency: 'sat', comment, maxSat: paidAmount, description, extra})
+  }
+  const amountMsat = Number(response.amountMsat ?? response.amount_msat ?? 0) || paidAmount * 1000
   const feeMsat = Number(response.feeMsat ?? response.fee_msat ?? 0)
   return {
     ok: response.ok === true,
     error: response.error || '',
-    amount,
-    amountSat: amount,
+    amount: paidAmount,
+    amountSat: paidAmount,
+    requestedAmount: amount,
     checkingId: response.checkingId || response.checking_id || '',
     paymentHash: response.paymentHash || response.payment_hash || '',
     status: response.status || '',
@@ -404,6 +420,13 @@ function payPlayer({walletId, lnAddress, amount, comment, description, extra}) {
     feeMsat,
     fee_msat: feeMsat
   }
+}
+
+function minimumLnurlAmountSats(error) {
+  const match = String(error || '').match(/smaller than (?:the )?minimum\s+([0-9]+(?:\.[0-9]+)?)/i)
+  if (!match) return 0
+  const minimumMsat = Number(match[1])
+  return Number.isFinite(minimumMsat) ? Math.ceil(minimumMsat / 1000) : 0
 }
 
 function refundPlayer(game, lnAddress, amount, gameId, reason) {

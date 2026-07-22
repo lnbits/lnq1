@@ -12,6 +12,7 @@ const lnq1 = {
   game: null,
   gameId: gameIdFromUrl(),
   player: null,
+  localPlayerId: '',
   players: [],
   playerToken: '',
   realtime: null,
@@ -28,6 +29,7 @@ const lnq1 = {
   stats: {sent: 0, received: 0, httpFallbacks: 0, websocketErrors: 0},
   killed: new Set(),
   rewarded: new Set(),
+  debited: new Set(),
   announcedPlayers: new Set(),
   rosterSynced: false,
   session: {},
@@ -122,6 +124,10 @@ window.LNQ1_MULTIPLAYER = {
   onLocalDeath() {
     if (lnq1.respawning) return
     lnq1.respawning = true
+    debitLocalPlayer(
+      lnq1.player?.id || lnq1.localPlayerId,
+      lnq1.player?.paidAmount || lnq1.game?.joinAmount
+    )
     lnq1.player = {...(lnq1.player || {}), status: 'dead'}
     if (lnq1.heartbeatTimer) window.clearInterval(lnq1.heartbeatTimer)
     lnq1.heartbeatTimer = null
@@ -211,6 +217,7 @@ async function refreshGame() {
   const response = await api().getPublicGame(lnq1.gameId, lnq1.playerToken)
   lnq1.game = response.game || null
   lnq1.player = response.player || null
+  if (lnq1.player?.id) lnq1.localPlayerId = lnq1.player.id
   lnq1.players = Array.isArray(response.players) ? response.players : []
   announceJoinedPlayers(previousAlive)
   renderPlayersHud()
@@ -325,10 +332,14 @@ function handleRealtime(event) {
         addSats(payoutSats(data.payout))
       }
     }
-    if (data.victimId === lnq1.player?.id && window.game_entity_player) {
+    const killedLocalPlayer = data.victimId === lnq1.localPlayerId
+    if (killedLocalPlayer) {
+      debitLocalPlayer(
+        data.victimId,
+        data.victim?.paidAmount || lnq1.game?.joinAmount
+      )
       lnq1.player = {...(lnq1.player || {}), status: 'dead'}
-      addSats(-Number(data.victim?.paidAmount || lnq1.game?.joinAmount || 0))
-      window.game_entity_player._kill()
+      window.game_entity_player?._kill()
     } else {
       window.game_remove_remote_player?.(data.victimId)
     }
@@ -401,6 +412,15 @@ function addSats(amount) {
   const next = Math.trunc(Number(sessionGet(LNQ1_SESSION_SATS) || 0) + Number(amount || 0))
   sessionSet(LNQ1_SESSION_SATS, String(next))
   updateSatsHud()
+}
+
+function debitLocalPlayer(playerId, amount) {
+  const id = String(playerId || '')
+  const debit = Math.trunc(Number(amount || 0))
+  if (!id || debit <= 0 || lnq1.debited.has(id)) return false
+  lnq1.debited.add(id)
+  addSats(-debit)
+  return true
 }
 
 function updateSatsHud() {
